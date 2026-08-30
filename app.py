@@ -1,682 +1,581 @@
 import streamlit as st
+import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-import pandas as pd
-import json
 
-# ============================================================
-# PAGE CONFIG & GLOBAL STYLING
-# ============================================================
+# ---------------------------------------------------------
+# PAGE CONFIGURATION
+# ---------------------------------------------------------
 st.set_page_config(
-    page_title="Trading Money Management & Dynamic Compounding Calculator",
-    page_icon="📈",
+    page_title="Apex Compound | Professional Trade Engine",
+    page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# Custom CSS - Premium Dark Trading Terminal
+# ---------------------------------------------------------
+# CUSTOM CSS / FINTECH DARK TERMINAL THEME
+# ---------------------------------------------------------
 st.markdown("""
 <style>
-    /* Main background */
+    /* Dark Terminal Backgrounds */
     .stApp {
-        background-color: #0E1117;
-        color: #E0E0E0;
+        background-color: #0B0E14;
+        color: #E0E6ED;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
     
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #1A1C23;
-        border-right: 1px solid #2A2D3A;
-    }
-    
-    section[data-testid="stSidebar"] .stMarkdown h1,
-    section[data-testid="stSidebar"] .stMarkdown h2,
-    section[data-testid="stSidebar"] .stMarkdown h3 {
-        color: #00E676 !important;
-    }
-    
-    /* Metric cards */
-    div[data-testid="stMetric"] {
-        background: linear-gradient(145deg, #1A1C23, #16181F);
-        border: 1px solid #2A2D3A;
-        border-radius: 12px;
-        padding: 16px 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    }
-    
-    div[data-testid="stMetric"] label {
-        color: #8B8D97 !important;
-        font-size: 0.85rem !important;
-        font-weight: 500 !important;
-    }
-    
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        color: #FFFFFF !important;
-        font-size: 1.6rem !important;
-        font-weight: 700 !important;
-    }
-    
-    /* Positive / Negative delta */
-    div[data-testid="stMetricDelta"] svg {
-        display: none;
-    }
-    
-    /* Primary buttons */
-    .stButton > button {
-        border-radius: 10px;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        border: none;
-    }
-    
-    /* WIN button */
-    div[data-testid="stHorizontalBlock"] > div:nth-child(1) .stButton > button {
-        background: linear-gradient(135deg, #00C853, #00E676) !important;
-        color: #0E1117 !important;
-        font-size: 1.15rem !important;
-        padding: 0.75rem 1.5rem !important;
-        box-shadow: 0 4px 15px rgba(0, 230, 118, 0.35);
-    }
-    div[data-testid="stHorizontalBlock"] > div:nth-child(1) .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 230, 118, 0.5);
-    }
-    
-    /* LOSS button */
-    div[data-testid="stHorizontalBlock"] > div:nth-child(2) .stButton > button {
-        background: linear-gradient(135deg, #D50000, #FF1744) !important;
-        color: #FFFFFF !important;
-        font-size: 1.15rem !important;
-        padding: 0.75rem 1.5rem !important;
-        box-shadow: 0 4px 15px rgba(255, 23, 68, 0.35);
-    }
-    div[data-testid="stHorizontalBlock"] > div:nth-child(2) .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(255, 23, 68, 0.5);
-    }
-    
-    /* Undo / secondary buttons */
-    .stButton > button[kind="secondary"] {
-        background: #2A2D3A !important;
-        color: #E0E0E0 !important;
-        border: 1px solid #3A3D4A !important;
-    }
-    
-    /* Next Trade Card */
-    .next-trade-card {
-        background: linear-gradient(145deg, #1A1C23, #12141A);
-        border: 1px solid #00E67633;
-        border-radius: 16px;
-        padding: 24px 28px;
+    /* Top Header Bar */
+    .terminal-header {
+        border-left: 4px solid #00F0FF;
+        padding: 8px 16px;
+        background: linear-gradient(90deg, rgba(0, 240, 255, 0.08) 0%, rgba(11, 14, 20, 0) 100%);
+        border-radius: 4px;
         margin-bottom: 20px;
-        box-shadow: 0 8px 32px rgba(0, 230, 118, 0.08);
-        position: relative;
-        overflow: hidden;
     }
-    .next-trade-card::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, #00E676, #00B0FF);
+
+    /* Bento Stat Card */
+    .metric-card {
+        background: #151922;
+        border: 1px solid #232936;
+        border-radius: 8px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
-    
-    .next-trade-title {
-        color: #8B8D97;
-        font-size: 0.9rem;
-        font-weight: 500;
-        letter-spacing: 0.5px;
-        margin-bottom: 8px;
+    .metric-label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #8A94A6;
+        margin-bottom: 4px;
     }
-    
-    .next-trade-value {
-        color: #FFFFFF;
-        font-size: 2.2rem;
+    .metric-value {
+        font-size: 1.6rem;
         font-weight: 700;
-        margin: 4px 0;
+        letter-spacing: -0.02em;
+        color: #FFFFFF;
     }
-    
-    .next-trade-sub {
-        color: #00E676;
-        font-size: 1.05rem;
+    .metric-sub {
+        font-size: 0.8rem;
+        margin-top: 4px;
         font-weight: 500;
     }
     
-    .step-badge {
-        display: inline-block;
-        background: #00E67622;
-        color: #00E676;
-        border: 1px solid #00E67655;
-        border-radius: 20px;
-        padding: 4px 14px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        margin-bottom: 12px;
-    }
-    
-    /* Section headers */
-    .section-header {
-        color: #FFFFFF;
-        font-size: 1.15rem;
-        font-weight: 600;
-        margin: 8px 0 16px 0;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #2A2D3A;
-    }
-    
-    /* Feedback flash */
-    .win-flash {
-        background: linear-gradient(90deg, #00E67622, transparent);
-        border-left: 4px solid #00E676;
-        padding: 12px 18px;
-        border-radius: 0 8px 8px 0;
-        margin: 12px 0;
-        color: #00E676;
-        font-weight: 600;
-    }
-    .loss-flash {
-        background: linear-gradient(90deg, #FF174422, transparent);
-        border-left: 4px solid #FF1744;
-        padding: 12px 18px;
-        border-radius: 0 8px 8px 0;
-        margin: 12px 0;
-        color: #FF1744;
-        font-weight: 600;
-    }
-    
-    /* Dataframe styling */
-    .stDataFrame {
+    /* Primary Next-Trade Highlight Card */
+    .hero-card {
+        background: linear-gradient(145deg, #181E29, #131720);
+        border: 1px solid #2C3545;
+        border-top: 3px solid #00E676;
         border-radius: 12px;
-        overflow: hidden;
+        padding: 24px;
+        box-shadow: 0 8px 24px rgba(0, 230, 118, 0.05);
     }
     
-    /* Input fields */
-    .stNumberInput input, .stSelectbox select {
-        background-color: #1A1C23 !important;
-        color: #E0E0E0 !important;
-        border: 1px solid #2A2D3A !important;
-        border-radius: 8px !important;
+    /* Buttons Customization */
+    div.stButton > button:first-child {
+        border-radius: 6px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        transition: all 0.2s ease;
     }
     
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    /* Win Button Hook */
+    div[data-testid="stButton"] button[kind="primary"] {
+        background: linear-gradient(180deg, #00E676 0%, #00B359 100%) !important;
+        border: none !important;
+        color: #05140A !important;
+        box-shadow: 0 4px 14px rgba(0, 230, 118, 0.3) !important;
+    }
+    div[data-testid="stButton"] button[kind="primary"]:hover {
+        background: linear-gradient(180deg, #1AFF8A 0%, #00CC66 100%) !important;
+        box-shadow: 0 6px 20px rgba(0, 230, 118, 0.5) !important;
+    }
     
-    /* Divider */
-    hr {
-        border-color: #2A2D3A !important;
+    /* Loss Button Hook */
+    div[data-testid="stButton"] button[kind="secondary"] {
+        background: linear-gradient(180deg, #FF1744 0%, #D50032 100%) !important;
+        border: none !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 4px 14px rgba(255, 23, 68, 0.3) !important;
+    }
+    div[data-testid="stButton"] button[kind="secondary"]:hover {
+        background: linear-gradient(180deg, #FF4569 0%, #E60039 100%) !important;
+        box-shadow: 0 6px 20px rgba(255, 23, 68, 0.5) !important;
+    }
+
+    /* Subtle Table/Dataframe styling */
+    .stDataFrame {
+        border: 1px solid #232936;
+        border-radius: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ============================================================
+# ---------------------------------------------------------
 # SESSION STATE INITIALIZATION
-# ============================================================
-def init_session_state():
-    defaults = {
-        "initial_capital": 1000.0,
-        "risk_pct": 2.0,
-        "payout_pct": 85.0,
-        "compound_steps": 2,          # 0 = Off (Flat)
-        "current_capital": 1000.0,
-        "peak_capital": 1000.0,
-        "current_step": 0,            # 0-based inside cycle
-        "trade_history": [],
-        "equity_curve": [1000.0],
-        "total_wins": 0,
-        "total_losses": 0,
-        "current_streak": 0,          # positive = win streak, negative = loss streak
-        "last_action": None,          # "WIN" / "LOSS" / None
-        "last_pl": 0.0,
-        "settings_saved": False,
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
+# ---------------------------------------------------------
+DEFAULT_CONFIG = {
+    "initial_capital": 1000.0,
+    "risk_pct": 2.0,
+    "payout_pct": 85.0,
+    "max_steps": 2,
+    "currency_symbol": "$"
+}
 
-init_session_state()
+if "config" not in st.session_state:
+    st.session_state.config = DEFAULT_CONFIG.copy()
 
-# ============================================================
-# CORE BUSINESS LOGIC
-# ============================================================
-def calculate_base_stake(capital: float, risk_pct: float) -> float:
-    return round(capital * (risk_pct / 100.0), 2)
+if "capital" not in st.session_state:
+    st.session_state.capital = float(st.session_state.config["initial_capital"])
 
-def get_current_stake() -> float:
-    """Return the stake that should be used for the next trade."""
-    if st.session_state.compound_steps == 0 or st.session_state.current_step == 0:
-        return calculate_base_stake(st.session_state.current_capital, st.session_state.risk_pct)
-    
-    # In compounding mode and mid-cycle → stake is previous full return
-    # We store the "pending_stake" when we win mid-cycle
-    return st.session_state.get("pending_stake", 
-                                calculate_base_stake(st.session_state.current_capital, st.session_state.risk_pct))
-
-def process_win():
-    stake = get_current_stake()
-    payout = st.session_state.payout_pct / 100.0
-    profit = round(stake * payout, 2)
-    total_return = round(stake + profit, 2)
-    
-    max_steps = st.session_state.compound_steps
-    
-    # Record trade
-    trade = {
-        "trade_no": len(st.session_state.trade_history) + 1,
-        "cycle_step": st.session_state.current_step + 1 if max_steps > 0 else 0,
-        "stake": stake,
-        "result": "WIN",
-        "net_pl": profit,
-        "balance": 0.0,  # will set below
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    
-    if max_steps == 0:
-        # Flat risk – always add profit to capital
-        st.session_state.current_capital = round(st.session_state.current_capital + profit, 2)
-        st.session_state.current_step = 0
-        st.session_state.pending_stake = None
-    else:
-        # Compounding active
-        if st.session_state.current_step + 1 >= max_steps:
-            # Cycle complete → lock full profit into capital, reset
-            st.session_state.current_capital = round(st.session_state.current_capital + profit, 2)
-            # Note: the original stake was already "at risk" from capital perspective
-            # but because we compound the return, the net addition is just the profit
-            # (the stake itself was never removed until a loss)
-            st.session_state.current_step = 0
-            st.session_state.pending_stake = None
-        else:
-            # Mid-cycle win → do NOT add to capital yet; next stake = full return
-            st.session_state.current_step += 1
-            st.session_state.pending_stake = total_return
-            # Capital remains the same until cycle finishes or a loss occurs
-    
-    trade["balance"] = st.session_state.current_capital
-    st.session_state.trade_history.append(trade)
-    
-    # Update stats
-    st.session_state.total_wins += 1
-    if st.session_state.current_streak >= 0:
-        st.session_state.current_streak += 1
-    else:
-        st.session_state.current_streak = 1
-    
-    st.session_state.peak_capital = max(st.session_state.peak_capital, st.session_state.current_capital)
-    st.session_state.equity_curve.append(st.session_state.current_capital)
-    st.session_state.last_action = "WIN"
-    st.session_state.last_pl = profit
-
-def process_loss():
-    stake = get_current_stake()
-    
-    # On loss the stake is deducted from capital
-    st.session_state.current_capital = round(st.session_state.current_capital - stake, 2)
-    
-    trade = {
-        "trade_no": len(st.session_state.trade_history) + 1,
-        "cycle_step": st.session_state.current_step + 1 if st.session_state.compound_steps > 0 else 0,
-        "stake": stake,
-        "result": "LOSS",
-        "net_pl": -stake,
-        "balance": st.session_state.current_capital,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    st.session_state.trade_history.append(trade)
-    
-    # Reset compounding cycle
+if "current_step" not in st.session_state:
     st.session_state.current_step = 0
-    st.session_state.pending_stake = None
+
+if "current_stake" not in st.session_state:
+    st.session_state.current_stake = (
+        st.session_state.capital * (st.session_state.config["risk_pct"] / 100.0)
+    )
+
+if "trade_history" not in st.session_state:
+    st.session_state.trade_history = []
+
+if "last_action_msg" not in st.session_state:
+    st.session_state.last_action_msg = None
+
+# ---------------------------------------------------------
+# BUSINESS LOGIC & CALCULATION ENGINES
+# ---------------------------------------------------------
+def recalculate_current_stake():
+    """Recalculates stake based on cycle step and current capital."""
+    if st.session_state.current_step == 0:
+        st.session_state.current_stake = round(
+            st.session_state.capital * (st.session_state.config["risk_pct"] / 100.0), 2
+        )
+
+def execute_trade(is_win: bool):
+    """Processes a trade outcome and shifts compounding cycles."""
+    curr_stake = st.session_state.current_stake
+    payout_rate = st.session_state.config["payout_pct"] / 100.0
+    step = st.session_state.current_step
+    max_steps = st.session_state.config["max_steps"]
     
-    # Stats
-    st.session_state.total_losses += 1
-    if st.session_state.current_streak <= 0:
-        st.session_state.current_streak -= 1
-    else:
-        st.session_state.current_streak = -1
-    
-    st.session_state.equity_curve.append(st.session_state.current_capital)
-    st.session_state.last_action = "LOSS"
-    st.session_state.last_pl = -stake
+    # Save snapshot for undo capability
+    state_snapshot = {
+        "capital": st.session_state.capital,
+        "current_step": st.session_state.current_step,
+        "current_stake": st.session_state.current_stake,
+    }
+
+    if is_win:
+        profit = round(curr_stake * payout_rate, 2)
+        total_return = round(curr_stake + profit, 2)
+        new_balance = round(st.session_state.capital + profit, 2)
+        
+        record = {
+            "Trade #": len(st.session_state.trade_history) + 1,
+            "Timestamp": datetime.now().strftime("%H:%M:%S"),
+            "Cycle Step": f"Step {step + 1}/{max_steps if max_steps > 0 else 'Flat'}",
+            "Stake": curr_stake,
+            "Result": "WIN",
+            "Net P/L": profit,
+            "Updated Balance": new_balance,
+            "_snapshot": state_snapshot
+        }
+        st.session_state.trade_history.append(record)
+        st.session_state.capital = new_balance
+
+        # Compounding progression logic
+        if max_steps > 0 and (step + 1) < max_steps:
+            st.session_state.current_step += 1
+            st.session_state.current_stake = total_return
+            st.session_state.last_action_msg = ("WIN", f"Won +{st.session_state.config['currency_symbol']}{profit:.2f}! Compounding forward to Step {st.session_state.current_step + 1}.")
+        else:
+            st.session_state.current_step = 0
+            recalculate_current_stake()
+            cycle_note = "Cycle completed! Profit secured." if max_steps > 0 else "Trade won!"
+            st.session_state.last_action_msg = ("WIN", f"{cycle_note} Resetting to base stake.")
+            
+    else:  # LOSS
+        loss_amount = curr_stake
+        new_balance = round(st.session_state.capital - loss_amount, 2)
+        
+        record = {
+            "Trade #": len(st.session_state.trade_history) + 1,
+            "Timestamp": datetime.now().strftime("%H:%M:%S"),
+            "Cycle Step": f"Step {step + 1}/{max_steps if max_steps > 0 else 'Flat'}",
+            "Stake": curr_stake,
+            "Result": "LOSS",
+            "Net P/L": -loss_amount,
+            "Updated Balance": new_balance,
+            "_snapshot": state_snapshot
+        }
+        st.session_state.trade_history.append(record)
+        st.session_state.capital = new_balance
+        
+        # Reset cycle completely
+        st.session_state.current_step = 0
+        recalculate_current_stake()
+        st.session_state.last_action_msg = ("LOSS", f"Loss incurred (-{st.session_state.config['currency_symbol']}{loss_amount:.2f}). Compounding reset to Step 1.")
 
 def undo_last_trade():
+    """Rolls back the latest trade state."""
     if not st.session_state.trade_history:
         return
-    
-    last = st.session_state.trade_history.pop()
-    
-    # Revert capital
-    st.session_state.current_capital = round(st.session_state.current_capital - last["net_pl"], 2)
-    
-    # Revert stats
-    if last["result"] == "WIN":
-        st.session_state.total_wins = max(0, st.session_state.total_wins - 1)
-    else:
-        st.session_state.total_losses = max(0, st.session_state.total_losses - 1)
-    
-    # Revert equity curve
-    if len(st.session_state.equity_curve) > 1:
-        st.session_state.equity_curve.pop()
-    
-    # Recalculate peak
-    st.session_state.peak_capital = max(st.session_state.equity_curve) if st.session_state.equity_curve else st.session_state.initial_capital
-    
-    # Reset step / pending (simple conservative approach)
-    st.session_state.current_step = 0
-    st.session_state.pending_stake = None
-    st.session_state.current_streak = 0
-    st.session_state.last_action = None
-    st.session_state.last_pl = 0.0
+    last_trade = st.session_state.trade_history.pop()
+    snapshot = last_trade["_snapshot"]
+    st.session_state.capital = snapshot["capital"]
+    st.session_state.current_step = snapshot["current_step"]
+    st.session_state.current_stake = snapshot["current_stake"]
+    st.session_state.last_action_msg = ("INFO", f"Trade #{last_trade['Trade #']} undone.")
 
 def full_reset():
-    init_cap = st.session_state.initial_capital
-    risk = st.session_state.risk_pct
-    payout = st.session_state.payout_pct
-    steps = st.session_state.compound_steps
-    
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    
-    init_session_state()
-    st.session_state.initial_capital = init_cap
-    st.session_state.current_capital = init_cap
-    st.session_state.peak_capital = init_cap
-    st.session_state.risk_pct = risk
-    st.session_state.payout_pct = payout
-    st.session_state.compound_steps = steps
-    st.session_state.equity_curve = [init_cap]
-
-def clear_history():
-    st.session_state.trade_history = []
-    st.session_state.equity_curve = [st.session_state.current_capital]
-    st.session_state.total_wins = 0
-    st.session_state.total_losses = 0
-    st.session_state.current_streak = 0
-    st.session_state.last_action = None
+    """Resets entire app to configured defaults."""
+    st.session_state.capital = float(st.session_state.config["initial_capital"])
     st.session_state.current_step = 0
-    st.session_state.pending_stake = None
+    recalculate_current_stake()
+    st.session_state.trade_history = []
+    st.session_state.last_action_msg = None
 
-# ============================================================
-# SIDEBAR – SETTINGS
-# ============================================================
+# ---------------------------------------------------------
+# SIDEBAR / CONFIGURATION PANEL
+# ---------------------------------------------------------
 with st.sidebar:
-    st.markdown("## ⚙️ Capital & Risk Config")
-    st.markdown("---")
+    st.markdown("### ⚙️ Risk Configuration")
+    st.caption("Customize account risk and execution engine parameters.")
     
-    init_cap = st.number_input(
-        "Initial Capital ($)",
-        min_value=10.0,
-        max_value=1_000_000.0,
-        value=float(st.session_state.initial_capital),
-        step=100.0,
-        format="%.2f"
-    )
+    currency = st.selectbox("Display Currency", options=["$", "৳", "€", "£", "₹"], index=0)
+    st.session_state.config["currency_symbol"] = currency
     
-    risk = st.number_input(
-        "Risk per Trade (%)",
-        min_value=0.1,
-        max_value=20.0,
-        value=float(st.session_state.risk_pct),
-        step=0.1,
-        format="%.1f"
-    )
+    init_cap = st.number_input("Initial Capital", min_value=1.0, value=st.session_state.config["initial_capital"], step=50.0)
+    risk_pct = st.slider("Risk Per Trade (Base %)", min_value=0.5, max_value=20.0, value=st.session_state.config["risk_pct"], step=0.5)
+    payout_pct = st.slider("Payout Rate (%)", min_value=10.0, max_value=200.0, value=st.session_state.config["payout_pct"], step=1.0)
     
-    payout = st.number_input(
-        "Payout Rate (%)",
-        min_value=10.0,
-        max_value=200.0,
-        value=float(st.session_state.payout_pct),
-        step=1.0,
-        format="%.1f",
-        help="Typical binary options: 70-95%. Custom risk-reward also supported."
-    )
-    
-    st.markdown("### Compounding Engine")
-    compound_options = {
+    step_options = {
         "Off (Flat Risk)": 0,
         "1-Step Compounding": 1,
         "2-Step Compounding": 2,
         "3-Step Compounding": 3,
-        "4-Step Compounding": 4,
-        "5-Step Compounding": 5,
+        "4-Step Compounding": 4
     }
-    # Reverse lookup for current value
-    current_label = next((k for k, v in compound_options.items() if v == st.session_state.compound_steps), "2-Step Compounding")
-    selected_label = st.selectbox(
-        "Compounding Steps",
-        options=list(compound_options.keys()),
-        index=list(compound_options.keys()).index(current_label)
-    )
-    selected_steps = compound_options[selected_label]
     
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        if st.button("💾 Save Settings", use_container_width=True):
-            st.session_state.initial_capital = init_cap
-            st.session_state.risk_pct = risk
-            st.session_state.payout_pct = payout
-            st.session_state.compound_steps = selected_steps
-            
-            # If no trades yet, also reset current capital
-            if len(st.session_state.trade_history) == 0:
-                st.session_state.current_capital = init_cap
-                st.session_state.peak_capital = init_cap
-                st.session_state.equity_curve = [init_cap]
-            
-            st.session_state.settings_saved = True
-            st.rerun()
-    
-    with col_s2:
-        if st.button("↺ Defaults", use_container_width=True):
-            st.session_state.initial_capital = 1000.0
-            st.session_state.risk_pct = 2.0
-            st.session_state.payout_pct = 85.0
-            st.session_state.compound_steps = 2
-            if len(st.session_state.trade_history) == 0:
-                st.session_state.current_capital = 1000.0
-                st.session_state.peak_capital = 1000.0
-                st.session_state.equity_curve = [1000.0]
-            st.rerun()
-    
-    if st.session_state.settings_saved:
-        st.success("Settings saved ✓")
-        st.session_state.settings_saved = False
-    
+    current_step_label = [k for k, v in step_options.items() if v == st.session_state.config["max_steps"]][0]
+    comp_mode = st.selectbox("Compounding Mode", options=list(step_options.keys()), index=list(step_options.keys()).index(current_step_label))
+    selected_steps = step_options[comp_mode]
+
+    if st.button("Apply Settings", use_container_width=True):
+        st.session_state.config.update({
+            "initial_capital": init_cap,
+            "risk_pct": risk_pct,
+            "payout_pct": payout_pct,
+            "max_steps": selected_steps,
+        })
+        if len(st.session_state.trade_history) == 0:
+            st.session_state.capital = init_cap
+        recalculate_current_stake()
+        st.toast("Settings updated successfully.", icon="✅")
+
     st.markdown("---")
-    st.markdown("### 📖 How Compounding Works")
-    st.caption("""
-**Step 0**: Base stake = Capital × Risk%  
-**On WIN** (mid-cycle): Next stake = previous Stake + Profit  
-**On WIN** (final step): Profit locked into capital, cycle resets  
-**On LOSS**: Stake deducted, cycle immediately resets to Step 0
-    """)
+    if st.button("Reset Entire Account", use_container_width=True):
+        full_reset()
+        st.rerun()
 
-# ============================================================
-# MAIN DASHBOARD
-# ============================================================
-st.markdown("# 📈 Trading Money Management")
-st.markdown("##### Dynamic Compounding Calculator · Risk Engine")
+# ---------------------------------------------------------
+# ANALYTICS CALCULATIONS
+# ---------------------------------------------------------
+curr_cap = st.session_state.capital
+init_cap = st.session_state.config["initial_capital"]
+net_roi = ((curr_cap - init_cap) / init_cap) * 100.0 if init_cap > 0 else 0.0
 
-# ---- Performance Metrics ----
-total_trades = st.session_state.total_wins + st.session_state.total_losses
-win_rate = (st.session_state.total_wins / total_trades * 100) if total_trades > 0 else 0.0
-net_roi = ((st.session_state.current_capital - st.session_state.initial_capital) / st.session_state.initial_capital * 100) if st.session_state.initial_capital > 0 else 0.0
+trades = st.session_state.trade_history
+total_trades = len(trades)
+wins = sum(1 for t in trades if t["Result"] == "WIN")
+losses = sum(1 for t in trades if t["Result"] == "LOSS")
+win_rate = (wins / total_trades * 100.0) if total_trades > 0 else 0.0
 
-# Profit Factor
-gross_profit = sum(t["net_pl"] for t in st.session_state.trade_history if t["net_pl"] > 0)
-gross_loss = abs(sum(t["net_pl"] for t in st.session_state.trade_history if t["net_pl"] < 0))
-profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else (gross_profit if gross_profit > 0 else 0.0)
+total_profit = sum(t["Net P/L"] for t in trades if t["Net P/L"] > 0)
+total_loss = abs(sum(t["Net P/L"] for t in trades if t["Net P/L"] < 0))
+profit_factor = (total_profit / total_loss) if total_loss > 0 else (total_profit if total_profit > 0 else 1.0)
 
-streak_display = f"+{st.session_state.current_streak}" if st.session_state.current_streak > 0 else str(st.session_state.current_streak)
-if st.session_state.current_streak == 0:
-    streak_display = "—"
+# Calculate streaks and peak capital
+current_streak_type = "None"
+current_streak_count = 0
+peak_capital = init_cap
 
-m1, m2, m3, m4, m5, m6 = st.columns(6)
-m1.metric("Current Balance", f"${st.session_state.current_capital:,.2f}", f"{net_roi:+.2f}% ROI")
-m2.metric("Total Trades", f"{total_trades}")
-m3.metric("Win Rate", f"{win_rate:.1f}%")
-m4.metric("Wins / Losses", f"{st.session_state.total_wins} / {st.session_state.total_losses}")
-m5.metric("Current Streak", streak_display)
-m6.metric("Profit Factor", f"{profit_factor:.2f}", f"Peak ${st.session_state.peak_capital:,.2f}")
-
-st.markdown("")
-
-# ---- Next Trade Card + Action Buttons ----
-left_col, right_col = st.columns([1.4, 1])
-
-with left_col:
-    stake = get_current_stake()
-    potential_profit = round(stake * (st.session_state.payout_pct / 100.0), 2)
+if trades:
+    balances = [init_cap] + [t["Updated Balance"] for t in trades]
+    peak_capital = max(balances)
     
-    step_text = "Flat Risk (No Compounding)"
-    if st.session_state.compound_steps > 0:
-        step_text = f"Step {st.session_state.current_step + 1} of {st.session_state.compound_steps}"
+    last_res = trades[-1]["Result"]
+    current_streak_type = last_res
+    streak = 0
+    for t in reversed(trades):
+        if t["Result"] == last_res:
+            streak += 1
+        else:
+            break
+    current_streak_count = streak
+
+# ---------------------------------------------------------
+# DASHBOARD HEADER & TOP STATS BENTO-GRID
+# ---------------------------------------------------------
+sym = st.session_state.config["currency_symbol"]
+
+st.markdown("""
+<div class="terminal-header">
+    <h2 style="margin:0; font-size: 1.5rem; font-weight:700; letter-spacing: -0.01em;">
+        ⚡ APEX DYNAMIC COMPOUNDING ENGINE
+    </h2>
+    <span style="font-size:0.85rem; color:#8A94A6;">Institutional Money Management & Systematic Position Sizer</span>
+</div>
+""", unsafe_allow_html=True)
+
+# Performance Cards
+kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
+
+with kpi1:
+    roi_color = "#00E676" if net_roi >= 0 else "#FF1744"
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Account Equity</div>
+        <div class="metric-value">{sym}{curr_cap:,.2f}</div>
+        <div class="metric-sub" style="color:{roi_color};">ROI: {net_roi:+.2f}%</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with kpi2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Win Rate</div>
+        <div class="metric-value">{win_rate:.1f}%</div>
+        <div class="metric-sub" style="color:#8A94A6;">{wins}W / {losses}L (Tot: {total_trades})</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with kpi3:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Profit Factor</div>
+        <div class="metric-value">{profit_factor:.2f}</div>
+        <div class="metric-sub" style="color:#8A94A6;">W/L Ratio</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with kpi4:
+    streak_color = "#00E676" if current_streak_type == "WIN" else ("#FF1744" if current_streak_type == "LOSS" else "#8A94A6")
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Active Streak</div>
+        <div class="metric-value" style="color:{streak_color};">{current_streak_count} {current_streak_type}</div>
+        <div class="metric-sub" style="color:#8A94A6;">Consecutive run</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with kpi5:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Peak Capital</div>
+        <div class="metric-value">{sym}{peak_capital:,.2f}</div>
+        <div class="metric-sub" style="color:#8A94A6;">High-water mark</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.write("")
+
+# ---------------------------------------------------------
+# INTERACTIVE EXECUTION DESK & NEXT TRADE CARD
+# ---------------------------------------------------------
+col_left, col_right = st.columns([1.1, 1.9], gap="large")
+
+with col_left:
+    current_step_display = st.session_state.current_step + 1
+    total_steps = st.session_state.config["max_steps"]
+    step_str = f"Step {current_step_display} of {total_steps}" if total_steps > 0 else "Flat Risk Mode"
+    
+    recommended_stake = min(st.session_state.current_stake, st.session_state.capital)
+    potential_profit = round(recommended_stake * (st.session_state.config["payout_pct"] / 100.0), 2)
     
     st.markdown(f"""
-    <div class="next-trade-card">
-        <div class="step-badge">{step_text}</div>
-        <div class="next-trade-title">RECOMMENDED STAKE</div>
-        <div class="next-trade-value">${stake:,.2f}</div>
-        <div class="next-trade-sub">Potential Profit on Win → +${potential_profit:,.2f}</div>
-        <div style="margin-top:14px; color:#8B8D97; font-size:0.9rem;">
-            Current Capital: <strong style="color:#fff;">${st.session_state.current_capital:,.2f}</strong>
-            &nbsp;&nbsp;|&nbsp;&nbsp; Risk: <strong style="color:#fff;">{st.session_state.risk_pct}%</strong>
-            &nbsp;&nbsp;|&nbsp;&nbsp; Payout: <strong style="color:#fff;">{st.session_state.payout_pct}%</strong>
+    <div class="hero-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font-size:0.8rem; text-transform:uppercase; color:#00F0FF; font-weight:700; letter-spacing:0.05em;">
+                Active Execution Matrix
+            </span>
+            <span style="background:rgba(0,240,255,0.12); color:#00F0FF; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:600;">
+                {step_str}
+            </span>
+        </div>
+        <div style="font-size:0.85rem; color:#8A94A6;">Recommended Position Stake</div>
+        <div style="font-size:2.8rem; font-weight:800; color:#FFFFFF; margin: 2px 0 16px 0;">
+            {sym}{recommended_stake:,.2f}
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; padding-top:12px; border-top:1px solid #232936;">
+            <div>
+                <div style="font-size:0.75rem; color:#8A94A6;">Potential Return</div>
+                <div style="color:#00E676; font-weight:700; font-size:1.1rem;">+{sym}{potential_profit:,.2f}</div>
+            </div>
+            <div>
+                <div style="font-size:0.75rem; color:#8A94A6;">Risk-to-Capital</div>
+                <div style="color:#E0E6ED; font-weight:700; font-size:1.1rem;">
+                    {(recommended_stake / st.session_state.capital * 100.0) if st.session_state.capital > 0 else 0:.1f}%
+                </div>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Action buttons
-    b1, b2, b3 = st.columns([1, 1, 1])
-    with b1:
-        if st.button("🟢  WIN", use_container_width=True, key="win_btn"):
-            if st.session_state.current_capital <= 0:
-                st.error("Insufficient capital.")
-            else:
-                process_win()
-                st.rerun()
-    with b2:
-        if st.button("🔴  LOSS", use_container_width=True, key="loss_btn"):
-            if st.session_state.current_capital <= 0:
-                st.error("Insufficient capital.")
-            else:
-                process_loss()
-                st.rerun()
-    with b3:
-        if st.button("↩ Undo Last", use_container_width=True, key="undo_btn"):
-            undo_last_trade()
+    st.write("")
+    
+    # Notification Banner
+    if st.session_state.last_action_msg:
+        status, msg = st.session_state.last_action_msg
+        if status == "WIN":
+            st.success(msg)
+        elif status == "LOSS":
+            st.error(msg)
+        else:
+            st.info(msg)
+            
+    # Instant Execution Buttons
+    btn_win_col, btn_loss_col = st.columns(2)
+    with btn_win_col:
+        if st.button("WIN", type="primary", use_container_width=True):
+            execute_trade(is_win=True)
             st.rerun()
-    
-    # Visual feedback
-    if st.session_state.last_action == "WIN":
-        st.markdown(f'<div class="win-flash">✓ WIN recorded · +${st.session_state.last_pl:,.2f}</div>', unsafe_allow_html=True)
-    elif st.session_state.last_action == "LOSS":
-        st.markdown(f'<div class="loss-flash">✗ LOSS recorded · ${st.session_state.last_pl:,.2f}</div>', unsafe_allow_html=True)
+            
+    with btn_loss_col:
+        if st.button("LOSS", type="secondary", use_container_width=True):
+            execute_trade(is_win=False)
+            st.rerun()
+            
+    if st.button("↩ Undo Last Trade", use_container_width=True):
+        undo_last_trade()
+        st.rerun()
 
-with right_col:
-    st.markdown('<div class="section-header">Equity Curve</div>', unsafe_allow_html=True)
+# ---------------------------------------------------------
+# EQUITY CURVE & GROWTH VISUALIZATION
+# ---------------------------------------------------------
+with col_right:
+    # Compile Balance Trajectory
+    plot_data = [{"Trade": 0, "Balance": init_cap, "Result": "START"}]
+    for t in trades:
+        plot_data.append({
+            "Trade": t["Trade #"],
+            "Balance": t["Updated Balance"],
+            "Result": t["Result"]
+        })
+    df_plot = pd.DataFrame(plot_data)
     
-    eq = st.session_state.equity_curve
     fig = go.Figure()
     
+    # Base Capital Reference Line
+    fig.add_hline(
+        y=init_cap, 
+        line_dash="dash", 
+        line_color="#4A5568", 
+        annotation_text="Base Capital", 
+        annotation_position="bottom right"
+    )
+    
+    # Equity Curve
     fig.add_trace(go.Scatter(
-        x=list(range(len(eq))),
-        y=eq,
+        x=df_plot["Trade"],
+        y=df_plot["Balance"],
         mode="lines+markers",
-        line=dict(color="#00E676", width=2.5),
-        marker=dict(size=5, color="#00E676"),
+        line=dict(color="#00F0FF", width=3, shape="spline"),
+        marker=dict(
+            size=7,
+            color=["#8A94A6" if r == "START" else "#00E676" if r == "WIN" else "#FF1744" for r in df_plot["Result"]],
+            line=dict(width=1, color="#FFFFFF")
+        ),
         fill="tozeroy",
-        fillcolor="rgba(0, 230, 118, 0.08)",
-        name="Capital"
+        fillcolor="rgba(0, 240, 255, 0.04)",
+        name="Equity",
+        hovertemplate="Trade #%{x}<br>Balance: " + sym + "%{y:,.2f}<extra></extra>"
     ))
-    
-    # Peak marker
-    if len(eq) > 1:
-        peak_idx = eq.index(max(eq))
-        fig.add_trace(go.Scatter(
-            x=[peak_idx],
-            y=[eq[peak_idx]],
-            mode="markers",
-            marker=dict(size=10, color="#00B0FF", symbol="diamond"),
-            name="Peak"
-        ))
-    
+
     fig.update_layout(
+        title=dict(text="Equity Progression Curve", font=dict(size=14, color="#E0E6ED")),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=10, r=10, t=20, b=30),
-        height=280,
+        plot_bgcolor="#11141C",
+        margin=dict(l=20, r=20, t=40, b=20),
+        height=320,
         xaxis=dict(
-            title="Trade #",
-            gridcolor="#2A2D3A",
-            zerolinecolor="#2A2D3A",
-            color="#8B8D97"
+            title="Trade Number",
+            showgrid=True,
+            gridcolor="#1D2330",
+            dtick=1 if len(df_plot) <= 15 else None,
+            tickfont=dict(color="#8A94A6")
         ),
         yaxis=dict(
-            title="Capital ($)",
-            gridcolor="#2A2D3A",
-            zerolinecolor="#2A2D3A",
-            color="#8B8D97",
-            tickprefix="$"
+            title=f"Balance ({sym})",
+            showgrid=True,
+            gridcolor="#1D2330",
+            tickprefix=sym,
+            tickfont=dict(color="#8A94A6")
         ),
-        legend=dict(font=dict(color="#8B8D97"), bgcolor="rgba(0,0,0,0)"),
-        font=dict(color="#E0E0E0")
+        hovermode="x unified"
     )
-    st.plotly_chart(fig, use_container_width=True)
+    
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-# ---- Trade History ----
-st.markdown('<div class="section-header">Trade History</div>', unsafe_allow_html=True)
+# ---------------------------------------------------------
+# AUDIT LOG / TRADE HISTORY TABLE
+# ---------------------------------------------------------
+st.markdown("---")
+h_col1, h_col2 = st.columns([2, 1])
+
+with h_col1:
+    st.markdown("### 📋 Trade Execution Log")
+
+with h_col2:
+    c_btn1, c_btn2 = st.columns(2)
+    with c_btn1:
+        if st.session_state.trade_history:
+            df_export = pd.DataFrame(st.session_state.trade_history).drop(columns=["_snapshot"])
+            csv_data = df_export.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Export CSV",
+                data=csv_data,
+                file_name=f"apex_trades_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+    with c_btn2:
+        if st.session_state.trade_history:
+            if st.button("🗑️ Clear Log", use_container_width=True):
+                st.session_state.trade_history = []
+                st.rerun()
 
 if st.session_state.trade_history:
-    df = pd.DataFrame(st.session_state.trade_history)
-    df = df.rename(columns={
-        "trade_no": "Trade #",
-        "cycle_step": "Cycle Step",
-        "stake": "Stake ($)",
-        "result": "Result",
-        "net_pl": "Net P/L ($)",
-        "balance": "Balance ($)",
-        "timestamp": "Timestamp"
-    })
+    df_display = pd.DataFrame(st.session_state.trade_history).drop(columns=["_snapshot"])
     
-    # Color the Result column via Styler
-    def color_result(val):
+    # Custom format styling function
+    def style_rows(val):
         if val == "WIN":
-            return "color: #00E676; font-weight: 600"
+            return 'color: #00E676; font-weight: 700;'
         elif val == "LOSS":
-            return "color: #FF1744; font-weight: 600"
-        return ""
-    
-    styled = df.style.map(color_result, subset=["Result"]).format({
-        "Stake ($)": "{:.2f}",
-        "Net P/L ($)": "{:+.2f}",
-        "Balance ($)": "{:.2f}"
-    })
-    
-    st.dataframe(styled, use_container_width=True, height=320)
-    
-    # Export / Clear controls
-    c1, c2, c3, _ = st.columns([1, 1, 1, 3])
-    with c1:
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "📥 Export CSV",
-            data=csv,
-            file_name=f"trade_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    with c2:
-        if st.button("🗑️ Clear History", use_container_width=True):
-            clear_history()
-            st.rerun()
-    with c3:
-        if st.button("🔄 Full Reset", use_container_width=True):
-            full_reset()
-            st.rerun()
-else:
-    st.info("No trades yet. Configure your risk settings and click **WIN** or **LOSS** to begin.")
+            return 'color: #FF1744; font-weight: 700;'
+        return ''
 
-# Footer
-st.markdown("---")
-st.caption("Trading Money Management & Dynamic Compounding Calculator · Risk carefully · Past performance ≠ future results")
+    def style_pl(val):
+        if isinstance(val, (int, float)):
+            if val > 0:
+                return 'color: #00E676; font-weight: 600;'
+            elif val < 0:
+                return 'color: #FF1744; font-weight: 600;'
+        return ''
+
+    styled_df = (
+        df_display.style
+        .format({
+            "Stake": f"{sym}{{:,.2f}}",
+            "Net P/L": f"{sym}{{:,.2f}}",
+            "Updated Balance": f"{sym}{{:,.2f}}"
+        })
+        .map(style_rows, subset=["Result"])
+        .map(style_pl, subset=["Net P/L"])
+    )
+    
+    st.dataframe(styled_df, use_container_width=True, height=260)
+else:
+    st.info("No trade history recorded yet. Execute your first trade using the Win / Loss buttons above.")
