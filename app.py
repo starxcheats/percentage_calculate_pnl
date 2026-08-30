@@ -7,7 +7,7 @@ from datetime import datetime
 # PAGE CONFIGURATION
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Apex Compound | Professional Trade Engine",
+    page_title="Star_X_Trader Compound | Professional Trade Engine",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
