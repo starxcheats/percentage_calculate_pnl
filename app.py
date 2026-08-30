@@ -323,7 +323,7 @@ sym = st.session_state.config["currency_symbol"]
 st.markdown("""
 <div class="terminal-header">
     <h2 style="margin:0; font-size: 1.5rem; font-weight:700; letter-spacing: -0.01em;">
-        ⚡ APEX DYNAMIC COMPOUNDING ENGINE
+        ⚡ STAR_X_TRADER DYNAMIC COMPOUNDING ENGINE
     </h2>
     <span style="font-size:0.85rem; color:#8A94A6;">Institutional Money Management & Systematic Position Sizer</span>
 </div>
