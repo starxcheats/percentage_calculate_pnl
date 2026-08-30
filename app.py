@@ -1,223 +1,292 @@
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime
 
-# --- PAGE CONFIGURATION ---
+import json
+from datetime import datetime
+from pathlib import Path
+
+import streamlit as st
+
+DATA_FILE = Path("trading_settings.json")
+
 st.set_page_config(
-    page_title="TradeMaster - Money Management",
+    page_title="TradeFlow Money Manager",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# --- CUSTOM CSS (HIGH-END TRADING TERMINAL UI) ---
+# ---------- Theme / CSS ----------
 st.markdown("""
 <style>
-    .main { background-color: #0d1117; color: #f0f6fc; }
-    .stMetric {
-        background: #161b22;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #30363d;
+    .stApp {
+        background:
+            radial-gradient(circle at 15% 10%, rgba(88, 166, 255, .10), transparent 28%),
+            radial-gradient(circle at 85% 0%, rgba(0, 220, 150, .08), transparent 25%),
+            #07111f;
+        color: #eaf2ff;
     }
-    .trade-card {
-        background: linear-gradient(145deg, #1c2128, #161b22);
-        padding: 24px;
-        border-radius: 14px;
-        border: 1px solid #388bfd;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    [data-testid="stSidebar"] {
+        background: #091626;
+        border-right: 1px solid rgba(255,255,255,.07);
+    }
+    .hero {
+        padding: 26px 30px;
+        border: 1px solid rgba(125,180,255,.16);
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(18,42,69,.95), rgba(8,25,43,.92));
+        box-shadow: 0 18px 50px rgba(0,0,0,.22);
         margin-bottom: 20px;
     }
-    div[data-testid="stButton"] > button:first-child {
-        border-radius: 8px;
+    .hero h1 { margin: 0; font-size: 34px; letter-spacing: -.8px; }
+    .hero p { margin: 7px 0 0; color: #9fb4cc; }
+    .card {
+        padding: 18px 20px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 18px;
+        background: rgba(12,28,47,.78);
+        box-shadow: 0 10px 28px rgba(0,0,0,.14);
+        min-height: 112px;
+    }
+    .label { color:#8da4bf; font-size:13px; text-transform:uppercase; letter-spacing:.8px; }
+    .value { font-size:28px; font-weight:800; margin-top:7px; }
+    .positive { color:#35d39a; }
+    .negative { color:#ff6b7a; }
+    .accent { color:#69a9ff; }
+    .muted { color:#8da4bf; }
+    .trade-row {
+        padding: 12px 14px;
+        margin: 8px 0;
+        border-radius: 14px;
+        background: #0b1a2c;
+        border: 1px solid rgba(255,255,255,.06);
+    }
+    .small { font-size: 12px; color:#8da4bf; }
+    div.stButton > button {
+        border-radius: 12px;
+        min-height: 44px;
         font-weight: 700;
-        font-size: 16px;
-        height: 50px;
+    }
+    .section-title { font-size:20px; font-weight:800; margin: 5px 0 14px; }
+    .formula {
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: #081525;
+        border: 1px dashed rgba(105,169,255,.25);
+        color:#b8c9dc;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE INITIALIZATION ---
-if "capital" not in st.session_state:
-    st.session_state.initial_capital = 1000.0
-    st.session_state.capital = 1000.0
-    st.session_state.risk_percent = 2.0
-    st.session_state.payout_percent = 85.0
-    st.session_state.compounding_steps = 1
-    st.session_state.current_step = 0
-    st.session_state.history = []
-    st.session_state.current_stake = 20.0
+# ---------- State ----------
+DEFAULT = {
+    "initial_capital": 100.0,
+    "risk_pct": 5.0,
+    "win_return_pct": 85.0,
+    "session_name": "My Trading Session",
+    "trades": [],
+}
 
-# --- HELPER: CALCULATE CURRENT STAKE ---
-def update_stake():
-    base_stake = round(st.session_state.capital * (st.session_state.risk_percent / 100.0), 2)
-    if st.session_state.current_step == 0:
-        st.session_state.current_stake = max(base_stake, 1.0)
+def load_settings():
+    if DATA_FILE.exists():
+        try:
+            return json.loads(DATA_FILE.read_text())
+        except Exception:
+            pass
+    return DEFAULT.copy()
 
-# --- TRADE PROCESSING HANDLERS ---
-def handle_trade(is_win):
-    stake = st.session_state.current_stake
-    payout_rate = st.session_state.payout_percent / 100.0
-    
-    if is_win:
-        profit = round(stake * payout_rate, 2)
-        total_return = round(stake + profit, 2)
-        st.session_state.capital = round(st.session_state.capital + profit, 2)
-        result_text = "WIN"
-        
-        # Compounding logic check
-        if st.session_state.compounding_steps > 0:
-            if st.session_state.current_step < st.session_state.compounding_steps:
-                st.session_state.current_step += 1
-                # Next trade stake will be full returned amount (Stake + Profit)
-                st.session_state.current_stake = total_return
-            else:
-                # Cycle Completed! Reset to base
-                st.session_state.current_step = 0
-                update_stake()
-        else:
-            st.session_state.current_step = 0
-            update_stake()
-    else:
-        # LOSS
-        loss_amount = stake
-        st.session_state.capital = round(st.session_state.capital - loss_amount, 2)
-        profit = -loss_amount
-        result_text = "LOSS"
-        
-        # Loss breaks compounding cycle immediately
-        st.session_state.current_step = 0
-        update_stake()
+if "initialized" not in st.session_state:
+    saved = load_settings()
+    for k, v in saved.items():
+        st.session_state[k] = v
+    st.session_state.initialized = True
 
-    # Record trade history
-    st.session_state.history.append({
-        "Trade #": len(st.session_state.history) + 1,
-        "Time": datetime.now().strftime("%H:%M:%S"),
-        "Step": f"Step {st.session_state.current_step if is_win and st.session_state.current_step > 0 else 'Base'}",
-        "Stake ($)": stake,
-        "Result": result_text,
-        "P/L ($)": profit,
-        "Balance ($)": st.session_state.capital
-    })
+for k, v in DEFAULT.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+def current_capital():
+    return st.session_state.initial_capital + sum(t["pnl"] for t in st.session_state.trades)
+
+def trade_amount():
+    return current_capital() * st.session_state.risk_pct / 100
+
+def save_all():
+    payload = {k: st.session_state[k] for k in DEFAULT}
+    DATA_FILE.write_text(json.dumps(payload, indent=2))
+
+def clear_session():
+    st.session_state.trades = []
 
 def reset_all():
-    st.session_state.capital = st.session_state.initial_capital
-    st.session_state.current_step = 0
-    st.session_state.history = []
-    update_stake()
+    st.session_state.initial_capital = DEFAULT["initial_capital"]
+    st.session_state.risk_pct = DEFAULT["risk_pct"]
+    st.session_state.win_return_pct = DEFAULT["win_return_pct"]
+    st.session_state.session_name = DEFAULT["session_name"]
+    st.session_state.trades = []
 
-def clear_history():
-    st.session_state.history = []
-    st.session_state.current_step = 0
-    update_stake()
-
-# --- SIDEBAR CONFIGURATION ---
+# ---------- Sidebar ----------
 with st.sidebar:
-    st.title("⚙️ Settings")
-    
-    init_cap = st.number_input("Initial Capital ($)", min_value=10.0, max_value=1000000.0, value=st.session_state.initial_capital, step=50.0)
-    risk_pct = st.slider("Risk Per Trade (%)", min_value=0.5, max_value=20.0, value=st.session_state.risk_percent, step=0.5)
-    payout_pct = st.number_input("Broker Payout Rate (%)", min_value=10.0, max_value=100.0, value=st.session_state.payout_percent, step=1.0)
-    
-    comp_steps = st.selectbox(
-        "Compounding Cycle",
-        options=[0, 1, 2, 3, 4],
-        format_func=lambda x: "Off (Flat Risk)" if x == 0 else f"{x}-Step Compounding",
-        index=1
-    )
-    
-    if st.button("💾 Apply & Save Settings", use_container_width=True):
-        st.session_state.initial_capital = init_cap
-        st.session_state.risk_percent = risk_pct
-        st.session_state.payout_percent = payout_pct
-        st.session_state.compounding_steps = comp_steps
-        if not st.session_state.history:
-            st.session_state.capital = init_cap
-        update_stake()
-        st.success("Settings updated!")
+    st.markdown("## ⚙️ Money Manager")
+    st.caption("Dynamic % risk • live capital • trade journal")
+    st.divider()
 
-    st.markdown("---")
-    if st.button("🔄 Reset All to Default", use_container_width=True):
-        reset_all()
+    st.session_state.session_name = st.text_input(
+        "Session name", st.session_state.session_name
+    )
+    st.session_state.initial_capital = st.number_input(
+        "Initial capital",
+        min_value=0.01,
+        value=float(st.session_state.initial_capital),
+        step=10.0,
+        format="%.2f",
+    )
+    st.session_state.risk_pct = st.number_input(
+        "Per-trade %", min_value=0.01, max_value=100.0,
+        value=float(st.session_state.risk_pct), step=0.5, format="%.2f"
+    )
+    st.session_state.win_return_pct = st.number_input(
+        "Win return %", min_value=0.01, max_value=1000.0,
+        value=float(st.session_state.win_return_pct), step=1.0, format="%.2f"
+    )
+
+    st.divider()
+    if st.button("💾 Save Settings", use_container_width=True):
+        save_all()
+        st.success("Settings saved.")
+
+    if st.button("🧹 Clear Trades", use_container_width=True):
+        clear_session()
         st.rerun()
 
-# Ensure stake is synchronized
-if len(st.session_state.history) == 0 and st.session_state.current_step == 0:
-    update_stake()
+    if st.button("🔄 Full Reset", use_container_width=True):
+        reset_all()
+        save_all()
+        st.rerun()
 
-# --- MAIN DASHBOARD ---
-st.title("📊 Precision Trade & Compounding Manager")
+    st.divider()
+    st.caption("Win: capital × risk% × return%")
+    st.caption("Loss: capital × risk%")
 
-# 1. Top Metrics Bar
-col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-total_trades = len(st.session_state.history)
-wins = sum(1 for t in st.session_state.history if t["Result"] == "WIN")
-win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
-net_roi = ((st.session_state.capital - st.session_state.initial_capital) / st.session_state.initial_capital) * 100
+# ---------- Header ----------
+st.markdown(f"""
+<div class="hero">
+    <h1>📈 TradeFlow</h1>
+    <p>{st.session_state.session_name} · Dynamic percentage money management dashboard</p>
+</div>
+""", unsafe_allow_html=True)
 
-col_m1.metric("Current Balance", f"${st.session_state.capital:,.2f}", f"{net_roi:+.2f}% ROI")
-col_m2.metric("Total Trades", total_trades)
-col_m3.metric("Win Rate", f"{win_rate:.1f}%", f"{wins}W / {total_trades - wins}L")
-col_m4.metric("Active Cycle Step", f"Step {st.session_state.current_step}/{st.session_state.compounding_steps}")
+capital = current_capital()
+amount = trade_amount()
+wins = sum(t["result"] == "WIN" for t in st.session_state.trades)
+losses = sum(t["result"] == "LOSS" for t in st.session_state.trades)
+total = wins + losses
+winrate = (wins / total * 100) if total else 0
+net = capital - st.session_state.initial_capital
 
-st.markdown("<br>", unsafe_allow_html=True)
+# ---------- KPI cards ----------
+c1, c2, c3, c4, c5 = st.columns(5)
+cards = [
+    (c1, "Current Capital", f"{capital:,.2f}", "accent"),
+    (c2, "Next Trade Size", f"{amount:,.2f}", "accent"),
+    (c3, "Net P/L", f"{net:+,.2f}", "positive" if net >= 0 else "negative"),
+    (c4, "Win Rate", f"{winrate:.1f}%", "positive" if winrate >= 50 else "negative"),
+    (c5, "Trades", str(total), "accent"),
+]
+for col, label, value, cls in cards:
+    with col:
+        st.markdown(
+            f'<div class="card"><div class="label">{label}</div>'
+            f'<div class="value {cls}">{value}</div></div>',
+            unsafe_allow_html=True
+        )
 
-# 2. Next Trade Execution Card
-with st.container():
+st.write("")
+
+# ---------- Trade controls ----------
+left, right = st.columns([1.35, 1])
+with left:
+    st.markdown('<div class="section-title">🎯 Next Trade</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="formula">'
+        f'<b>Live calculation:</b> {capital:,.2f} × {st.session_state.risk_pct:.2f}% '
+        f'= <b>{amount:,.2f}</b> risk amount. '
+        f'Each new trade uses the <b>updated capital</b>, not the initial capital.'
+        f'</div>', unsafe_allow_html=True
+    )
+    st.write("")
+    b1, b2 = st.columns(2)
+    with b1:
+        if st.button("✅ WIN", use_container_width=True, type="primary"):
+            pnl = amount * st.session_state.win_return_pct / 100
+            before = capital
+            after = before + pnl
+            st.session_state.trades.append({
+                "trade": len(st.session_state.trades) + 1,
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "result": "WIN",
+                "capital_before": before,
+                "amount": amount,
+                "pnl": pnl,
+                "capital_after": after,
+            })
+            st.rerun()
+    with b2:
+        if st.button("❌ LOSS", use_container_width=True):
+            pnl = -amount
+            before = capital
+            after = before + pnl
+            st.session_state.trades.append({
+                "trade": len(st.session_state.trades) + 1,
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "result": "LOSS",
+                "capital_before": before,
+                "amount": amount,
+                "pnl": pnl,
+                "capital_after": after,
+            })
+            st.rerun()
+
+with right:
+    st.markdown('<div class="section-title">📊 Session Stats</div>', unsafe_allow_html=True)
+    avg = (net / total) if total else 0
     st.markdown(f"""
-    <div class="trade-card">
-        <h3 style="margin-top:0; color:#58a6ff;">🎯 Next Trade Execution</h3>
-        <div style="display: flex; gap: 30px; font-size: 18px;">
-            <div>Next Stake: <strong style="font-size:24px; color:#f0f6fc;">${st.session_state.current_stake:,.2f}</strong></div>
-            <div>Expected Profit: <strong style="font-size:24px; color:#3fb950;">+${(st.session_state.current_stake * (st.session_state.payout_percent/100)):,.2f}</strong></div>
-            <div>Mode: <span style="color:#e3b341;">{'Base Trade' if st.session_state.current_step == 0 else f'Compounding (Step {st.session_state.current_step})'}</span></div>
-        </div>
+    <div class="card">
+      <div class="label">Initial Capital</div><div class="value">{st.session_state.initial_capital:,.2f}</div>
+      <hr style="border-color:rgba(255,255,255,.06)">
+      <div class="label">Wins / Losses</div><div style="font-size:22px;font-weight:800">
+        <span class="positive">{wins}</span> / <span class="negative">{losses}</span>
+      </div>
+      <div class="small" style="margin-top:12px">Average P/L per trade: {avg:+,.2f}</div>
     </div>
     """, unsafe_allow_html=True)
 
-btn_col1, btn_col2, btn_col3 = st.columns([2, 2, 1])
+# ---------- Trade history ----------
+st.write("")
+st.markdown('<div class="section-title">📜 Trade History</div>', unsafe_allow_html=True)
 
-with btn_col1:
-    if st.button("✅ WIN", use_container_width=True, type="primary"):
-        handle_trade(is_win=True)
-        st.rerun()
-
-with btn_col2:
-    if st.button("❌ LOSS", use_container_width=True):
-        handle_trade(is_win=False)
-        st.rerun()
-
-with btn_col3:
-    if st.button("🗑️ Clear Log", use_container_width=True):
-        clear_history()
-        st.rerun()
-
-# 3. Chart & Trade History
-if st.session_state.history:
-    st.markdown("### 📈 Equity Progression")
-    df = pd.DataFrame(st.session_state.history)
-    
-    # Plotly Equity Chart
-    fig = go.Figure()
-    balances = [st.session_state.initial_capital] + df["Balance ($)"].tolist()
-    fig.add_trace(go.Scatter(
-        y=balances,
-        mode="lines+markers",
-        name="Balance",
-        line=dict(color="#2ea043", width=3),
-        marker=dict(size=6, color="#58a6ff")
-    ))
-    fig.update_layout(
-        template="plotly_dark",
-        margin=dict(l=20, r=20, t=20, b=20),
-        height=280,
-        xaxis_title="Trade Count",
-        yaxis_title="Balance ($)"
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("### 📜 Trade Log")
-    st.dataframe(df.iloc[::-1], use_container_width=True)
+if not st.session_state.trades:
+    st.info("No trades yet. Set your rules on the left, then press WIN or LOSS.")
 else:
-    st.info("💡 নো ট্রেড হিস্ট্রি। ট্রেড শুরু করতে উপরে 'WIN' বা 'LOSS' বাটনে ক্লিক করুন।")
+    for t in reversed(st.session_state.trades):
+        cls = "positive" if t["result"] == "WIN" else "negative"
+        icon = "🟢" if t["result"] == "WIN" else "🔴"
+        st.markdown(f"""
+        <div class="trade-row">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><b>Trade #{t["trade"]}</b> &nbsp; {icon} <span class="{cls}"><b>{t["result"]}</b></span>
+              <span class="small"> · {t["time"]}</span></div>
+            <div class="{cls}" style="font-size:18px;font-weight:800">{t["pnl"]:+,.2f}</div>
+          </div>
+          <div class="small" style="margin-top:7px">
+            Before: {t["capital_before"]:,.2f} &nbsp;•&nbsp;
+            Trade amount: {t["amount"]:,.2f} &nbsp;•&nbsp;
+            After: <b>{t["capital_after"]:,.2f}</b>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ---------- Footer ----------
+st.divider()
+st.caption(
+    "TradeFlow calculates every next trade from the latest updated capital. "
+    "Example: 100 → 5% trade → LOSS = 95 → next 5% = 4.75."
+)
